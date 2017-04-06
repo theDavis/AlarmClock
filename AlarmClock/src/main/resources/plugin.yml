@@ -1,0 +1,13 @@
+name: AlarmClock
+main: io.github.thedavis.alarmclock.AlarmClock
+version: 0.0.1-SNAPSHOT
+author: Davis Walsh
+commands:
+  setalarm:
+    description: Set an alarm.
+    usage: /setalarm [duration]
+    #permission: alarmclock.setalarm
+    #permission-message: You don't have permission to set alarms.
+  setkickalarm:
+    description: Set an alarm. Kicks players when it goes off.
+    usage: /setkickalarm [duration]
