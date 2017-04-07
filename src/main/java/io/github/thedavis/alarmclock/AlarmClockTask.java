@@ -3,6 +3,7 @@ package io.github.thedavis.alarmclock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.bukkit.entity.Player;
@@ -16,7 +17,7 @@ public class AlarmClockTask extends BukkitRunnable {
 	private long startTime;
 	private final boolean kickPlayers;
 	private final String message;
-	private List<Player> players;
+	private List<UUID> playerIds;
 
 	private boolean fifteenMinuteWarningEnabled = true;
 	private boolean fiveMinuteWarningEnabled = true;
@@ -27,20 +28,28 @@ public class AlarmClockTask extends BukkitRunnable {
 		this.kickPlayers = kickPlayers;
 		this.message = "Time is up, go outside!";
 		this.startTime = System.nanoTime();
-		this.players = new ArrayList<>(players);
+		this.playerIds = getUUIDs(players);
+	}
+	
+	private List<UUID> getUUIDs(Collection<? extends Player> players){
+		List<UUID> uuids = new ArrayList<>();
+		for(Player player : players){
+			uuids.add(player.getUniqueId());
+		}
+		return uuids;
 	}
 
 	@Override
 	public void run() {
 		final long minutesRemaining = getMinutesRemaining();
 		if(minutesRemaining <= 0){
-			for(Player player : players){
-				Player onlinePlayer = plugin.getServer().getPlayer(player.getUniqueId());
-				if(onlinePlayer.isOnline()){
+			for(UUID playerId : playerIds){
+				Player player = plugin.getServer().getPlayer(playerId);
+				if(player.isOnline()){
 					if(kickPlayers){
-						onlinePlayer.kickPlayer(message);
+						player.kickPlayer(message);
 					} else {
-						onlinePlayer.sendMessage(message);
+						player.sendMessage(message);
 					}
 				}
 			}
@@ -88,10 +97,10 @@ public class AlarmClockTask extends BukkitRunnable {
 	}
 
 	private void sendMinutesRemainingWarning(long minutesRemaining){
-		for(Player player : players){
-			Player onlinePlayer = plugin.getServer().getPlayer(player.getUniqueId());
-			if(onlinePlayer.isOnline()){
-				onlinePlayer.sendMessage("Only " + minutesRemaining + " minutes left, finish up!");
+		for(UUID playerId : playerIds){
+			Player player = plugin.getServer().getPlayer(playerId);
+			if(player.isOnline()){
+				player.sendMessage("Only " + minutesRemaining + " minutes left, finish up!");
 			}
 		}
 	}
