@@ -2,33 +2,32 @@ package io.github.thedavis.alarmclock;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import io.github.thedavis.alarmclock.actions.AlarmClockAction;
+import io.github.thedavis.alarmclock.actions.KickAction;
+import io.github.thedavis.alarmclock.actions.Warning;
+import io.github.thedavis.alarmclock.timers.TimerFactory;
+
 public class AlarmClockTask extends BukkitRunnable {
 	
 	private final JavaPlugin plugin;
-	private final long duration;
-	private long startTime;
-	private final boolean kickPlayers;
-	private final String message;
 	private List<UUID> playerIds;
-
-	private boolean fifteenMinuteWarningEnabled = true;
-	private boolean fiveMinuteWarningEnabled = true;
+	private Set<AlarmClockAction> actions;
 	
-	public AlarmClockTask(JavaPlugin plugin, long duration, boolean kickPlayers, Collection<? extends Player> players){
+	public AlarmClockTask(JavaPlugin plugin, long durationInMinutes, boolean kickPlayers, Collection<? extends Player> players){
 		this.plugin = plugin;
-		this.duration = duration;
-		this.kickPlayers = kickPlayers;
-		this.message = "Time is up, go outside!";
-		this.startTime = System.nanoTime();
 		this.playerIds = getUUIDs(players);
+		configureActions(durationInMinutes, kickPlayers, "Time to go to bed!");
 	}
 	
 	private List<UUID> getUUIDs(Collection<? extends Player> players){
@@ -38,70 +37,62 @@ public class AlarmClockTask extends BukkitRunnable {
 		}
 		return uuids;
 	}
+	
+	private void configureActions(long durationInMinutes, boolean kickPlayers, String message){
+		actions = new HashSet<>();
+		if(kickPlayers){
+			actions.add(new KickAction(plugin, TimerFactory.getSystemTimer(durationInMinutes), message));
+		} else {
+			actions.add(new Warning(plugin, TimerFactory.getSystemTimer(durationInMinutes), message));
+		}
+		
+		if(durationInMinutes > 5){
+			actions.add(new Warning(plugin, TimerFactory.getSystemTimer(durationInMinutes - 5), "5 minute warning!"));
+		}
+		
+		if(durationInMinutes > 10){
+			actions.add(new Warning(plugin, TimerFactory.getSystemTimer(durationInMinutes - 10), "10 minute warning!"));
+		}
+	}
 
 	@Override
 	public void run() {
-		final long minutesRemaining = getMinutesRemaining();
-		if(minutesRemaining <= 0){
-			for(UUID playerId : playerIds){
-				Player player = plugin.getServer().getPlayer(playerId);
-				if(player.isOnline()){
-					if(kickPlayers){
-						player.kickPlayer(message);
-					} else {
-						player.sendMessage(message);
-					}
-				}
+		updateActivePlayers();
+		performActions();
+		updateActiveActions();
+		cancelIfAllActionsComplete();
+	}
+	
+	private void updateActivePlayers(){
+		playerIds.removeIf(new Predicate<UUID>(){
+			@Override
+			public boolean test(UUID id) {
+				return !plugin.getServer().getPlayer(id).isOnline();
 			}
+		});
+	}
+	
+	private void performActions(){
+		actions.forEach(new Consumer<AlarmClockAction>(){
+			@Override
+			public void accept(AlarmClockAction action) {
+				action.perform(playerIds);
+			}
+		});
+	}
+	
+	private void updateActiveActions(){
+		actions.removeIf(new Predicate<AlarmClockAction>(){
+			@Override
+			public boolean test(AlarmClockAction action) {
+				return !action.isActive();
+			}
+		});
+	}
+	
+	private void cancelIfAllActionsComplete(){
+		if(actions.isEmpty()){
 			this.cancel();
-		} else {
-			sendWarnings(minutesRemaining);
-		}
-	}
-	
-	private long getMinutesRemaining(){
-		return duration - getMinutesElapsed();
-	}
-	
-	private long getMinutesElapsed(){
-		long diff = System.nanoTime() - startTime;
-		return convertNanoSecondsToMinutes(diff);
-	}
-	
-	private long convertNanoSecondsToMinutes(long nanoTime){
-		return TimeUnit.MINUTES.convert(nanoTime, TimeUnit.NANOSECONDS);
-	}
-	
-	private void sendWarnings(long minutesRemaining){
-		if(fifteenMinuteWarningEnabled && lessThanFifteenMinutesRemain(minutesRemaining)){
-			sendMinutesRemainingWarning(minutesRemaining);
-			fifteenMinuteWarningEnabled = false;
-		}
-		
-		if(fiveMinuteWarningEnabled && lessThanFiveMinutesRemain(minutesRemaining)){
-			sendMinutesRemainingWarning(minutesRemaining);
-			fiveMinuteWarningEnabled = false;
-		}
-	}
-	
-	private boolean lessThanFifteenMinutesRemain(long minutesElapsed){
-		return timeRemainingIsLessThan(minutesElapsed, 15);
-	}
-	
-	private boolean lessThanFiveMinutesRemain(long minutesElapsed){
-		return timeRemainingIsLessThan(minutesElapsed, 5);
-	}
-	
-	private boolean timeRemainingIsLessThan(long remaining, long someDuration){
-		return remaining < someDuration;
-	}
-
-	private void sendMinutesRemainingWarning(long minutesRemaining){
-		for(UUID playerId : playerIds){
-			Player player = plugin.getServer().getPlayer(playerId);
-			if(player.isOnline()){
-				player.sendMessage("Only " + minutesRemaining + " minutes left, finish up!");
-			}
 		}
 	}
 }

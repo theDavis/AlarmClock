@@ -19,6 +19,7 @@ public class AlarmClock extends JavaPlugin {
 	@Override
 	public void onDisable(){
 		getLogger().info("AlarmClock has been disabled, all alarms will be canceled.");
+		this.getServer().getScheduler().cancelTasks(this);
 	}
 	
 	@Override
@@ -42,8 +43,9 @@ public class AlarmClock extends JavaPlugin {
 			try{
 				duration = getDuration(args);
 				kickPlayers = getKickPlayers(args);
-				AlarmClockTask alarmClock = new AlarmClockTask(this, duration, kickPlayers, this.getServer().getOnlinePlayers()); 
+				AlarmClockTask alarmClock = new AlarmClockTask(this, duration, kickPlayers, getServer().getOnlinePlayers()); 
 				alarmClock.runTaskTimer(this, 0, TICKS_FOR_ONE_MINUTE);
+				
 				return true;
 			} catch (NumberFormatException nfe){
 				sender.sendMessage("Invalid duration. Usage: /setalarm [duration in minutes] [true|false]");
