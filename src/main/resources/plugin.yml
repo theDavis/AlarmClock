@@ -5,7 +5,7 @@ author: Davis Walsh
 commands:
   setalarm:
     description: Set an alarm.
-    usage: /setalarm [duration]
+    usage: /setalarm [duration] [true|false}
     #permission: alarmclock.setalarm
     #permission-message: You don't have permission to set alarms.
   setkickalarm:
